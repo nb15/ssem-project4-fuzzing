@@ -87,7 +87,12 @@ By completing this project, you will:
 You must use the provided Docker/OSS-Fuzz workflow. Native local builds outside the containerized environment are \textbf{not supported}.
 
 \subsection*{Step 1: Get the Code}
-Clone the course repository from the link provided on Canvas.
+Clone the course repository from the link provided on Canvas, then enter the repository root:
+
+\begin{lstlisting}[style=bashstyle]
+git clone <repo-url>
+cd ssem-project4
+\end{lstlisting}
 
 The repository root should contain at least:
 \begin{itemize}
@@ -207,7 +212,7 @@ Then write a short reflection addressing both of the following:
 \section*{Submission Instructions}
 Submit the following on Canvas:
 \begin{itemize}
-    \item your patched \texttt{libpng-course/course/course\_vuln.c} file \textbf{or} a patch/diff against the original file,
+    \item your patched \texttt{libpng-course/course/course\_vuln.c} file \textbf{or} a unified patch/diff against the original file,
     \item your writeup (PDF or Markdown), and
     \item a small folder named \texttt{reproducers/} containing two files, one input for each bug you fixed.
 \end{itemize}
@@ -243,6 +248,28 @@ Correct code is necessary but not sufficient. Clear reasoning and validation mat
 
 \section*{Academic Integrity}
 You may discuss high-level ideas with classmates, but all code, debugging, and writing must be your own. Do not share completed solutions, crash inputs with explanations, or patched source files.
+
+\section*{Use of Generative AI Tools}
+Students are permitted to use generative AI tools (e.g., large language models) to assist with aspects of this project, including:
+\begin{itemize}
+    \item understanding sanitizer reports, compiler errors, or unfamiliar C/C++ syntax,
+    \item debugging code or exploring alternative bug fixes,
+    \item clarifying how fuzzing, memory errors, or Docker-based workflows operate,
+    \item brainstorming approaches to reproducing and validating crashes, and
+    \item improving the clarity of written explanations.
+\end{itemize}
+
+However, all submitted work must reflect your own understanding and reasoning. In particular:
+\begin{itemize}
+    \item You may not submit code, patches, or explanations that you do not understand.
+    \item You may not outsource the core debugging, repair, or interpretation of the bugs to an AI system.
+    \item You should be able to explain what each bug was, why your fix is correct, and how you verified it.
+\end{itemize}
+
+You are responsible for the correctness of any code, reproducer inputs, and written explanations you submit, regardless of whether an AI tool was used to help generate them. We may ask questions about your fixes, reproducer inputs, or debugging process to assess understanding.
+
+This project emphasizes debugging, reasoning, validation, and explanation. Over-reliance on generative tools without understanding may negatively affect grading, especially in categories related to diagnosis, correctness, and written explanation.
+
 
 \section*{Notes on Fuzzing Engine Choice}
 This project uses \texttt{libFuzzer} in the provided workflow because it integrates smoothly with the local OSS-Fuzz setup and is easier to run consistently across different laptop environments through Docker. AFL++ is an important modern standalone fuzzer and may be discussed in class, but all required grading for this project uses the provided \texttt{libFuzzer}-based workflow.
