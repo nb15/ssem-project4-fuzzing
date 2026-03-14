@@ -1,0 +1,250 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tcolorbox}
+
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, urlcolor=blue!60!black}
+\setlist[itemize]{topsep=4pt,itemsep=3pt,leftmargin=1.4em}
+\setlist[enumerate]{topsep=4pt,itemsep=3pt,leftmargin=1.6em}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+
+\lstdefinestyle{bashstyle}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{black!3},
+  frame=single,
+  rulecolor=\color{black!15},
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Project \#4: Find and Fix Bugs with Fuzzing}
+\rhead{Secure System Engineering and Management}
+\cfoot{\thepage}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{Project \#4: Find and Fix Bugs with Fuzzing}}\\[0.4em]
+    {\large Secure System Engineering and Management}\\[0.4em]
+    Due date: \textit{XXXXXX}
+\end{center}
+
+\section*{Overview}
+In this project, you will use coverage-guided fuzzing to discover, reproduce, diagnose, and fix memory-safety bugs in a buggy PNG-processing target. The target is based on \texttt{libpng} and is packaged in a containerized local OSS-Fuzz workflow so that everyone uses the same build and runtime environment.
+
+The goal is to practice the core workflow used in modern software security engineering:
+\begin{itemize}
+    \item run a fuzzer against a target,
+    \item interpret sanitizer crash reports,
+    \item trace the bug to its root cause in source code,
+    \item patch the bug correctly, and
+    \item verify that the crashing input no longer crashes without breaking valid behavior.
+\end{itemize}
+
+This project emphasizes debugging and repair, not just crash discovery. You are expected to read C/C++ source, understand AddressSanitizer reports, and implement correct fixes.
+
+\section*{What You Are Given}
+You are provided with a repository containing:
+\begin{itemize}
+    \item a buggy course-owned fuzz target based on \texttt{libpng},
+    \item an OSS-Fuzz project configuration for local Docker-based fuzzing,
+    \item a small PNG seed corpus to help the fuzzer reach valid parsing paths,
+    \item a fuzz harness and intentionally seeded memory-safety bugs, and
+    \item helper scripts for building, fuzzing, reproducing crashes, and post-fix regression testing.
+\end{itemize}
+
+You should not replace the provided target with a different target. Your work should focus on understanding, fixing, and validating the bugs in the provided code.
+
+\section*{Learning Objectives}
+By completing this project, you will:
+\begin{itemize}
+    \item run a containerized fuzzing workflow with a real parser target,
+    \item interpret AddressSanitizer reports for memory-safety bugs,
+    \item reproduce crashes from specific inputs,
+    \item diagnose and patch use-after-free and double-free bugs,
+    \item understand how bug discovery can be sequential, and
+    \item validate that fixes eliminate the crash while preserving correct behavior on valid inputs.
+\end{itemize}
+
+\section*{Setup Instructions (Read Carefully)}
+You must use the provided Docker/OSS-Fuzz workflow. Native local builds outside the containerized environment are \textbf{not supported}.
+
+\subsection*{Step 1: Get the Code}
+Clone the course repository from the link provided on Canvas.
+
+The repository root should contain at least:
+\begin{itemize}
+    \item \texttt{libpng-course/}
+    \item \texttt{oss-fuzz/}
+    \item \texttt{seed\_corpus/}
+    \item \texttt{scripts/}
+\end{itemize}
+
+\subsection*{Step 2: Install Prerequisites}
+You need:
+\begin{itemize}
+    \item Git
+    \item Docker Desktop (Mac/Windows) or Docker Engine (Linux)
+    \item Python 3
+\end{itemize}
+
+Confirm the following work in a terminal:
+\begin{lstlisting}[style=bashstyle]
+git --version
+docker --version
+python3 --version
+\end{lstlisting}
+
+\subsection*{Step 3: Build the Project}
+From the repository root, run:
+\begin{lstlisting}[style=bashstyle]
+./scripts/build.sh
+\end{lstlisting}
+
+This script:
+\begin{itemize}
+    \item builds the OSS-Fuzz image,
+    \item builds the fuzz target, and
+    \item installs the provided PNG seed corpus in the correct location.
+\end{itemize}
+
+\subsection*{Step 4: Run the Fuzzer}
+From the repository root, run:
+\begin{lstlisting}[style=bashstyle]
+./scripts/fuzz.sh 30
+\end{lstlisting}
+
+This runs the fuzzer for 30 seconds. You may increase the time if needed.
+
+\subsection*{Step 5: Reproduce an Input}
+To reproduce a crash on a specific input, run:
+\begin{lstlisting}[style=bashstyle]
+./scripts/reproduce.sh seed_corpus/pngnow.png
+\end{lstlisting}
+
+For generated crash inputs, replace the argument with the appropriate file path.
+
+\subsection*{Step 6: Post-Fix Regression Check}
+After fixing the required bugs, run:
+\begin{lstlisting}[style=bashstyle]
+./scripts/test_valid.sh
+\end{lstlisting}
+
+This verifies that the provided valid PNG inputs still execute successfully after your fixes.
+
+\subsection*{Debugging Common Issues}
+\begin{itemize}
+    \item \textbf{Docker not running:} Start Docker Desktop or the Docker daemon, then rerun the commands.
+    \item \textbf{Permission denied on scripts:} Run \texttt{chmod +x scripts/*.sh}.
+    \item \textbf{Seed corpus not used:} Re-run \texttt{./scripts/build.sh}. The build script installs the seed corpus automatically.
+    \item \textbf{Build succeeds but fuzzing finds nothing:} Confirm that \texttt{fuzz.sh} prints \texttt{Using seed corpus: course\_png\_fuzzer\_seed\_corpus.zip}.
+\end{itemize}
+
+\section*{Project Instructions}
+This is a debugging and code-repair assignment.
+
+You must use fuzzing to identify and fix \textbf{two distinct seeded bugs} in the provided target. These bugs are designed to be discovered \textbf{sequentially}:
+\begin{enumerate}
+    \item Run the fuzzer and identify the first bug.
+    \item Reproduce the crash and patch the bug.
+    \item Rebuild the project.
+    \item Run the fuzzer again to expose the next bug.
+    \item Reproduce and patch the second bug.
+\end{enumerate}
+
+A complete solution requires more than simply running the fuzzer: you must understand each crash, locate the buggy code, implement a correct fix, and verify that your fix preserves expected behavior.
+
+You should implement your fixes in:
+\begin{lstlisting}[style=bashstyle]
+libpng-course/course/course_vuln.c
+\end{lstlisting}
+
+Do not replace the provided target with a different target, and do not substantially rewrite the provided fuzzing infrastructure.
+
+\subsection*{What Counts as a Correct Fix?}
+A correct fix:
+\begin{itemize}
+    \item removes the memory-safety error,
+    \item modifies the buggy target logic rather than simply deleting large parts of the code,
+    \item does not reject all inputs indiscriminately, and
+    \item preserves normal behavior on the provided valid PNG inputs.
+\end{itemize}
+
+\section*{Required Writeup}
+For each bug you fix, answer the following:
+\begin{enumerate}
+    \item What input triggered the crash?
+    \item What sanitizer error was reported?
+    \item Which function and line caused the bug?
+    \item What is the root cause?
+    \item How did you fix it?
+    \item How did you verify the fix?
+\end{enumerate}
+
+Then write a short reflection addressing both of the following:
+\begin{enumerate}
+    \item What did fuzzing help you discover that would have been harder to find by inspection alone?
+    \item What are the limitations of coverage-guided fuzzing in this project, especially for reaching deeper semantic conditions?
+\end{enumerate}
+
+\section*{Submission Instructions}
+Submit the following on Canvas:
+\begin{itemize}
+    \item your patched \texttt{libpng-course/course/course\_vuln.c} file \textbf{or} a patch/diff against the original file,
+    \item your writeup (PDF or Markdown), and
+    \item a small folder named \texttt{reproducers/} containing two files, one input for each bug you fixed.
+\end{itemize}
+
+Name the reproducer files clearly, for example:
+\begin{lstlisting}[style=bashstyle]
+reproducers/bug1_input
+reproducers/bug2_input
+\end{lstlisting}
+
+These reproducer files are raw binary inputs. They are \textbf{not} screenshots or pasted text. They should be the exact files you use with \texttt{./scripts/reproduce.sh}.
+
+Do not submit Docker images, corpora generated during fuzzing, or unrelated build artifacts.
+
+\section*{Grading}
+This project is graded using a combination of automated checks and manual review.
+
+\begin{center}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.62\linewidth} >{\raggedleft\arraybackslash}p{0.18\linewidth}}
+\toprule
+Component & Weight \\
+\midrule
+Setup works; code builds and runs in the provided workflow & 15\% \\
+Bug 1: reproducer, diagnosis, and fix & 25\% \\
+Bug 2: reproducer, diagnosis, and fix & 25\% \\
+Validation that crashing inputs no longer crash and valid PNGs still work & 20\% \\
+Clarity and correctness of the written explanations & 15\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Correct code is necessary but not sufficient. Clear reasoning and validation matter.
+
+\section*{Academic Integrity}
+You may discuss high-level ideas with classmates, but all code, debugging, and writing must be your own. Do not share completed solutions, crash inputs with explanations, or patched source files.
+
+\section*{Notes on Fuzzing Engine Choice}
+This project uses \texttt{libFuzzer} in the provided workflow because it integrates smoothly with the local OSS-Fuzz setup and is easier to run consistently across different laptop environments through Docker. AFL++ is an important modern standalone fuzzer and may be discussed in class, but all required grading for this project uses the provided \texttt{libFuzzer}-based workflow.
+
+\end{document}
