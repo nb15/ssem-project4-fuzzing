@@ -48,7 +48,7 @@ Students should submit:
 
 - a patched `course_vuln.c` file or a patch/diff
 - a short writeup
-- a `reproducers/` folder containing two reproducing inputs, one for each bug fixed
+- two reproducing inputs, one for each bug fixed
 
 ## Notes
 
