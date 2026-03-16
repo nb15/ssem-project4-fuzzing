@@ -2,15 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OSSFUZZ="$ROOT/oss-fuzz"
+PROJECT="libpng-course"
 
-cd "$OSSFUZZ"
+cd "$ROOT/oss-fuzz"
 
-echo "Running regression tests on valid PNG inputs..."
+echo "Running regression tests..."
 
-python infra/helper.py reproduce libpng course_png_fuzzer "$ROOT/seed_corpus/pngnow.png"
-python infra/helper.py reproduce libpng course_png_fuzzer "$ROOT/seed_corpus/pngtest.png"
+python3 infra/helper.py reproduce "$PROJECT" course_png_fuzzer "$ROOT/seed_corpus/pngnow.png"
+python3 infra/helper.py reproduce "$PROJECT" course_png_fuzzer "$ROOT/seed_corpus/pngtest.png"
 
-echo
-echo "Regression test completed."
-echo "If your fixes are correct, these inputs should run without sanitizer errors."
+echo "Done."
