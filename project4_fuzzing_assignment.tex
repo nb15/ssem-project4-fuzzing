@@ -91,7 +91,7 @@ Clone the course repository from the link provided on Canvas, then enter the rep
 
 \begin{lstlisting}[style=bashstyle]
 git clone <repo-url>
-cd ssem-project4
+cd ssem-project4-fuzzing
 \end{lstlisting}
 
 The repository root should contain at least:
@@ -125,10 +125,14 @@ From the repository root, run:
 
 This script:
 \begin{itemize}
-    \item builds the OSS-Fuzz image,
+    \item builds the local OSS-Fuzz project named \texttt{libpng-course},
     \item builds the fuzz target, and
     \item installs the provided PNG seed corpus in the correct location.
 \end{itemize}
+
+If the build script asks whether to use a saved image or cached base images, always select \textbf{N}. Use the fresh rebuild path.
+
+The helper scripts explicitly use \texttt{python3}; if your system also has a \texttt{python} command, ignore it and use the provided scripts as written.
 
 \subsection*{Step 4: Run the Fuzzer}
 From the repository root, run:
@@ -136,7 +140,7 @@ From the repository root, run:
 ./scripts/fuzz.sh 30
 \end{lstlisting}
 
-This runs the fuzzer for 30 seconds. You may increase the time if needed.
+This runs the fuzzer for 30 seconds. You may increase the time if needed. With the provided seed corpus, the fuzzer should usually expose the first required bug quickly and print an AddressSanitizer report.
 
 \subsection*{Step 5: Reproduce an Input}
 To reproduce a crash on a specific input, run:
@@ -144,7 +148,7 @@ To reproduce a crash on a specific input, run:
 ./scripts/reproduce.sh seed_corpus/pngnow.png
 \end{lstlisting}
 
-For generated crash inputs, replace the argument with the appropriate file path.
+For some bugs, one of the provided seed inputs may already act as a reproducer. For generated crash inputs, replace the argument with the appropriate file path.
 
 \subsection*{Step 6: Post-Fix Regression Check}
 After fixing the required bugs, run:
@@ -160,6 +164,7 @@ This verifies that the provided valid PNG inputs still execute successfully afte
     \item \textbf{Permission denied on scripts:} Run \texttt{chmod +x scripts/*.sh}.
     \item \textbf{Seed corpus not used:} Re-run \texttt{./scripts/build.sh}. The build script installs the seed corpus automatically.
     \item \textbf{Build succeeds but fuzzing finds nothing:} Confirm that \texttt{fuzz.sh} prints \texttt{Using seed corpus: course\_png\_fuzzer\_seed\_corpus.zip}.
+    \item \textbf{Docker build fails with ``not enough free space'' or apt errors:} Your Docker environment may be out of disk space. Try \texttt{docker system prune -a -f} and \texttt{docker builder prune -a -f}, then rerun \texttt{./scripts/build.sh}.
 \end{itemize}
 
 \section*{Project Instructions}
@@ -214,7 +219,7 @@ Submit the following on Canvas:
 \begin{itemize}
     \item your patched \texttt{libpng-course/course/course\_vuln.c} file \textbf{or} a unified patch/diff against the original file,
     \item your writeup (PDF or Markdown), and
-    \item a small folder named \texttt{reproducers/} containing two files, one input for each bug you fixed.
+    \item a small folder named \texttt{reproducers/} containing two files, one reproducing input for each of the two bugs you fixed.
 \end{itemize}
 
 Name the reproducer files clearly, for example:
@@ -223,7 +228,7 @@ reproducers/bug1_input
 reproducers/bug2_input
 \end{lstlisting}
 
-These reproducer files are raw binary inputs. They are \textbf{not} screenshots or pasted text. They should be the exact files you use with \texttt{./scripts/reproduce.sh}.
+These reproducer files are raw binary inputs. They are \textbf{not} screenshots or pasted text. They should be the exact files you use with \texttt{./scripts/reproduce.sh}. After your fixes are applied, these same reproducer files should no longer trigger a sanitizer failure.
 
 Do not submit Docker images, corpora generated during fuzzing, or unrelated build artifacts.
 
@@ -269,7 +274,6 @@ However, all submitted work must reflect your own understanding and reasoning. I
 You are responsible for the correctness of any code, reproducer inputs, and written explanations you submit, regardless of whether an AI tool was used to help generate them. We may ask questions about your fixes, reproducer inputs, or debugging process to assess understanding.
 
 This project emphasizes debugging, reasoning, validation, and explanation. Over-reliance on generative tools without understanding may negatively affect grading, especially in categories related to diagnosis, correctness, and written explanation.
-
 
 \section*{Notes on Fuzzing Engine Choice}
 This project uses \texttt{libFuzzer} in the provided workflow because it integrates smoothly with the local OSS-Fuzz setup and is easier to run consistently across different laptop environments through Docker. AFL++ is an important modern standalone fuzzer and may be discussed in class, but all required grading for this project uses the provided \texttt{libFuzzer}-based workflow.
