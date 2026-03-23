@@ -14,6 +14,7 @@
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{tcolorbox}
+\usepackage{amsmath}
 
 \hypersetup{colorlinks=true, linkcolor=blue!60!black, urlcolor=blue!60!black}
 \setlist[itemize]{topsep=4pt,itemsep=3pt,leftmargin=1.4em}
@@ -32,6 +33,18 @@
   breaklines=true
 }
 
+\lstdefinestyle{cppstyle}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{black!3},
+  frame=single,
+  rulecolor=\color{black!15},
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  language=C++
+}
+
 \pagestyle{fancy}
 \fancyhf{}
 \lhead{Project \#4: Find and Fix Bugs with Fuzzing}
@@ -47,9 +60,14 @@
 \end{center}
 
 \section*{Overview}
-In this project, you will use coverage-guided fuzzing to discover, reproduce, diagnose, and fix memory-safety bugs in a buggy PNG-processing target. The target is based on \texttt{libpng} and is packaged in a containerized local OSS-Fuzz workflow so that everyone uses the same build and runtime environment.
+This project has two parts.
 
-The goal is to practice the core workflow used in modern software security engineering:
+\begin{itemize}
+    \item \textbf{Part 1:} Use coverage-guided fuzzing to discover, reproduce, diagnose, and fix memory-safety bugs in a buggy PNG-processing target.
+    \item \textbf{Part 2:} Design two small libFuzzer-based property-testing targets of your own and demonstrate them running.
+\end{itemize}
+
+The Part 1 target is based on \texttt{libpng} and is packaged in a containerized local OSS-Fuzz workflow so that everyone uses the same build and runtime environment. The goal is to practice the core workflow used in modern software security engineering:
 \begin{itemize}
     \item run a fuzzer against a target,
     \item interpret sanitizer crash reports,
@@ -58,7 +76,7 @@ The goal is to practice the core workflow used in modern software security engin
     \item verify that the crashing input no longer crashes without breaking valid behavior.
 \end{itemize}
 
-This project emphasizes debugging and repair, not just crash discovery. You are expected to read C/C++ source, understand AddressSanitizer reports, and implement correct fixes.
+The goal of Part 2 is to practice fuzzing for \emph{properties}, not just crashes: defining an invariant, turning raw bytes into structured values, and using libFuzzer creatively to find violations.
 
 \section*{What You Are Given}
 You are provided with a repository containing:
@@ -70,7 +88,13 @@ You are provided with a repository containing:
     \item helper scripts for building, fuzzing, reproducing crashes, and post-fix regression testing.
 \end{itemize}
 
-You should not replace the provided target with a different target. Your work should focus on understanding, fixing, and validating the bugs in the provided code.
+You should not replace the provided Part 1 target with a different target. Your work should focus on understanding, fixing, and validating the bugs in the provided code.
+
+For Part 2, the repository will also contain a directory for your own fuzzing targets:
+\begin{itemize}
+    \item \texttt{student\_targets/}
+\end{itemize}
+A starter template will be placed there for you to adapt.
 
 \section*{Learning Objectives}
 By completing this project, you will:
@@ -79,12 +103,13 @@ By completing this project, you will:
     \item interpret AddressSanitizer reports for memory-safety bugs,
     \item reproduce crashes from specific inputs,
     \item diagnose and patch use-after-free and double-free bugs,
-    \item understand how bug discovery can be sequential, and
-    \item validate that fixes eliminate the crash while preserving correct behavior on valid inputs.
+    \item understand how bug discovery can be sequential,
+    \item design small property-based fuzzing targets using libFuzzer, and
+    \item explain how target structure affects what a fuzzer can and cannot discover efficiently.
 \end{itemize}
 
-\section*{Setup Instructions (Read Carefully)}
-You must use the provided Docker/OSS-Fuzz workflow. Native local builds outside the containerized environment are \textbf{not supported}.
+\section*{Setup Instructions for Part 1 (Read Carefully)}
+You must use the provided Docker/OSS-Fuzz workflow for Part 1. Native local builds outside the containerized environment are \textbf{not supported} for Part 1.
 
 \subsection*{Step 1: Get the Code}
 Clone the course repository from the link provided on Canvas, then enter the repository root:
@@ -100,6 +125,7 @@ The repository root should contain at least:
     \item \texttt{oss-fuzz/}
     \item \texttt{seed\_corpus/}
     \item \texttt{scripts/}
+    \item \texttt{student\_targets/}
 \end{itemize}
 
 \subsection*{Step 2: Install Prerequisites}
@@ -132,7 +158,7 @@ This script:
 
 If the build script asks whether to use a saved image or cached base images, always select \textbf{N}. Use the fresh rebuild path.
 
-The helper scripts explicitly use \texttt{python3}; if your system also has a \texttt{python} command, ignore it and use the provided scripts as written.
+The helper scripts explicitly use \texttt{python3}. If your system also has a \texttt{python} command, ignore it and use the provided scripts exactly as written.
 
 \subsection*{Step 4: Run the Fuzzer}
 From the repository root, run:
@@ -142,13 +168,15 @@ From the repository root, run:
 
 This runs the fuzzer for 30 seconds. You may increase the time if needed. With the provided seed corpus, the fuzzer should usually expose the first required bug quickly and print an AddressSanitizer report.
 
+Finding a bug quickly is \textbf{expected behavior} in this assignment. In many cases, the first required bug appears within a few seconds. If you see an AddressSanitizer crash early, that usually means your setup is working correctly.
+
 \subsection*{Step 5: Reproduce an Input}
 To reproduce a crash on a specific input, run:
 \begin{lstlisting}[style=bashstyle]
 ./scripts/reproduce.sh seed_corpus/pngnow.png
 \end{lstlisting}
 
-For some bugs, one of the provided seed inputs may already act as a reproducer. For generated crash inputs, replace the argument with the appropriate file path.
+The provided seed inputs (for example, \texttt{pngnow.png} and \texttt{pngtest.png}) are valid PNG files that help the fuzzer reach deeper parsing logic. In some cases, one of these seed inputs may already trigger a bug. In other cases, the fuzzer will generate a new crashing input. You should use whichever file reliably reproduces the bug you are analyzing.
 
 \subsection*{Step 6: Post-Fix Regression Check}
 After fixing the required bugs, run:
@@ -167,8 +195,8 @@ This verifies that the provided valid PNG inputs still execute successfully afte
     \item \textbf{Docker build fails with ``not enough free space'' or apt errors:} Your Docker environment may be out of disk space. Try \texttt{docker system prune -a -f} and \texttt{docker builder prune -a -f}, then rerun \texttt{./scripts/build.sh}.
 \end{itemize}
 
-\section*{Project Instructions}
-This is a debugging and code-repair assignment.
+\section*{Part 1: Find and Fix Two Seeded Bugs}
+This is a debugging and code-repair task.
 
 You must use fuzzing to identify and fix \textbf{two distinct seeded bugs} in the provided target. These bugs are designed to be discovered \textbf{sequentially}:
 \begin{enumerate}
@@ -179,7 +207,7 @@ You must use fuzzing to identify and fix \textbf{two distinct seeded bugs} in th
     \item Reproduce and patch the second bug.
 \end{enumerate}
 
-A complete solution requires more than simply running the fuzzer: you must understand each crash, locate the buggy code, implement a correct fix, and verify that your fix preserves expected behavior.
+A complete Part 1 solution requires more than simply running the fuzzer: you must understand each crash, locate the buggy code, implement a correct fix, and verify that your fix preserves expected behavior.
 
 You should implement your fixes in:
 \begin{lstlisting}[style=bashstyle]
@@ -197,28 +225,228 @@ A correct fix:
     \item preserves normal behavior on the provided valid PNG inputs.
 \end{itemize}
 
-\section*{Required Writeup}
-For each bug you fix, answer the following:
+\subsection*{Part 1 Short Writeup}
+Keep the Part 1 writeup concise.
+
+For \textbf{each} of the two bugs, answer the following in \textbf{2--4 sentences total per question set}:
 \begin{enumerate}
-    \item What input triggered the crash?
-    \item What sanitizer error was reported?
-    \item Which function and line caused the bug?
-    \item What is the root cause?
-    \item How did you fix it?
+    \item What input reproduced the bug?
+    \item What sanitizer error and source location were reported?
+    \item What was the root cause, and how did you fix it?
     \item How did you verify the fix?
 \end{enumerate}
 
-Then write a short reflection addressing both of the following:
+Then write \textbf{one short paragraph total} addressing:
 \begin{enumerate}
-    \item What did fuzzing help you discover that would have been harder to find by inspection alone?
-    \item What are the limitations of coverage-guided fuzzing in this project, especially for reaching deeper semantic conditions?
+    \item Why did the second bug only become visible after the first bug was fixed?
+    \item What role did the seed corpus play in helping the fuzzer reach interesting behavior?
 \end{enumerate}
+
+\section*{Part 2: Build Two Property-Based Fuzz Targets}
+In Part 2, you will build \textbf{two small libFuzzer targets of your own}. This part is intentionally more open-ended and is meant to push you to think creatively about fuzzing \emph{properties}, not just memory crashes.
+
+Each target should:
+\begin{itemize}
+    \item consume raw bytes from libFuzzer,
+    \item convert those bytes into some structured input,
+    \item call code you wrote, and
+    \item check a property that should always hold.
+\end{itemize}
+
+Your job is to design two targets with different fuzzing behavior:
+\begin{itemize}
+    \item \textbf{Target A:} a property that is relatively easy for the fuzzer to violate or exercise,
+    \item \textbf{Target B:} a property that is meaningfully harder for the fuzzer to violate or exercise.
+\end{itemize}
+
+For both targets, the property should be framed as an \textbf{invariant} about your program. A good mental model is a statement of the form
+\[
+\forall x,\; P(x) \rightarrow Q(x),
+\]
+meaning: for all inputs \(x\) satisfying some precondition \(P(x)\), your program's behavior \(Q(x)\) should hold. For example, if your target library implemented binary search trees, a reasonable property might be: ``for all trees \(T\) and inserted values \(i\), if \(T\) is a binary search tree, then \texttt{insert(T, i)} should also be a binary search tree.'' A bug in insertion would violate that invariant.
+
+In other words, the goal is not merely to write code that crashes. The goal is to express a correctness property that should always hold and then use fuzzing to find inputs that violate it if your implementation is wrong.
+
+\subsection*{Important Restrictions}
+\begin{itemize}
+    \item You must create \textbf{two distinct} target programs.
+    \item You may \textbf{not} reuse the examples shown in lecture, including the exact ``\texttt{bad!}'' examples or the arithmetic property example shown on the slides.
+    \item The targets should be your own work and should not be copied from QuickCheck/libFuzzer tutorials.
+    \item The goal is not to create the biggest target possible. Small, focused, well-explained targets are better.
+\end{itemize}
+
+\subsection*{Suggested Target Ideas}
+You do \textbf{not} have to use these, but these are the right level of ambition:
+\begin{itemize}
+    \item round-trip property: encode then decode should recover the original value,
+    \item normalization/idempotence: applying a cleanup/normalize function twice should equal applying it once,
+    \item parser consistency: two equivalent interpretations should agree,
+    \item data structure invariants: a transformation should preserve length, ordering, or membership,
+    \item semantic consistency: two implementations of the same intended behavior should match.
+\end{itemize}
+
+\subsection*{Where to Put Your Part 2 Targets}
+Place your Part 2 code in:
+\begin{lstlisting}[style=bashstyle]
+student_targets/
+\end{lstlisting}
+
+A starter template will be provided there. You may duplicate and modify it to create your two targets.
+
+\subsection*{Part 2 Environment and Installation Notes}
+You should not need to install a new fuzzer separately for Part 2 if you use the same environment that you set up for Part 1. In particular, the Part 1 workflow already assumes access to a libFuzzer-capable toolchain, and the provided Part 2 starter template is designed to work with \texttt{clang++}, libFuzzer, and \texttt{FuzzedDataProvider}.
+
+If you choose to work outside that environment, then you are responsible for having:
+\begin{itemize}
+    \item a working \texttt{clang++} with libFuzzer support, and
+    \item access to the header \texttt{<fuzzer/FuzzedDataProvider.h>}.
+\end{itemize}
+
+If you use a different setup, document it clearly in your writeup.
+
+\subsection*{Using \texttt{FuzzedDataProvider}}
+You are encouraged to use \texttt{FuzzedDataProvider} to turn raw fuzzer bytes into structured values such as integers, booleans, strings, or small arrays. This is often much cleaner than manually slicing the input buffer by hand.
+
+To use it, include:
+\begin{lstlisting}[style=cppstyle]
+#include <fuzzer/FuzzedDataProvider.h>
+\end{lstlisting}
+
+Two useful references are:
+\begin{itemize}
+    \item \url{https://github.com/google/fuzzing/blob/master/docs/split-inputs.md#fuzzed-data-provider}
+    \item \url{https://google.github.io/oss-fuzz/getting-started/new-project-guide/}
+\end{itemize}
+
+Note that using \texttt{FuzzedDataProvider} often makes it much easier to define structured properties, but it also means the raw fuzz inputs are no longer meant to correspond to an externally meaningful file format. That is fine for this part of the assignment.
+
+\subsection*{Starter Template}
+You may copy this into a file such as \texttt{student\_targets/target1\_property\_fuzzer.cc} and adapt it.
+
+\begin{lstlisting}[style=cppstyle]
+#include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <string>
+#include <fuzzer/FuzzedDataProvider.h>
+
+// TODO: replace this with your own buggy logic.
+static std::string normalize_word(const std::string& s, bool lowercase) {
+  std::string out = s;
+  if (lowercase) {
+    for (char& c : out) {
+      if (c >= 'A' && c <= 'Z') c = c - 'A' + 'a';
+    }
+  }
+  return out;
+}
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+  FuzzedDataProvider fdp(data, size);
+
+  bool lowercase = fdp.ConsumeBool();
+  std::string s = fdp.ConsumeRandomLengthString(32);
+
+  std::string once = normalize_word(s, lowercase);
+  std::string twice = normalize_word(once, lowercase);
+
+  // TODO: replace with your own property.
+  // Example shape only:
+  // normalization should be idempotent
+  // assert(once == twice);
+
+  (void)once;
+  (void)twice;
+  return 0;
+}
+\end{lstlisting}
+
+\subsection*{Compile and Run Instructions for Part 2}
+Assuming your target is in a file named \texttt{student\_targets/target1\_property\_fuzzer.cc}, compile it with:
+
+\begin{lstlisting}[style=bashstyle]
+clang++ -g -O1 -fno-omit-frame-pointer \
+  -fsanitize=fuzzer,address \
+  student_targets/target1_property_fuzzer.cc -o target1_fuzzer
+\end{lstlisting}
+
+Then run it for 30 seconds:
+
+\begin{lstlisting}[style=bashstyle]
+./target1_fuzzer -max_total_time=30
+\end{lstlisting}
+
+Do the same for your second target:
+
+\begin{lstlisting}[style=bashstyle]
+clang++ -g -O1 -fno-omit-frame-pointer \
+  -fsanitize=fuzzer,address \
+  student_targets/target2_property_fuzzer.cc -o target2_fuzzer
+
+./target2_fuzzer -max_total_time=30
+\end{lstlisting}
+
+If your environment requires an equivalent libFuzzer-enabled C++ compiler, document exactly what you used in your writeup.
+
+\paragraph{Note on local compilation}
+On some systems (especially macOS), the default \texttt{clang++} may not include a working libFuzzer runtime. If you see errors mentioning missing \texttt{libclang\_rt.fuzzer}, you can either:
+\begin{itemize}
+    \item use the environment from Part 1, or
+    \item install a version of LLVM/Clang with libFuzzer support (e.g., via Homebrew on macOS).
+\end{itemize}
+
+\subsection*{Constraints for Part 2}
+\begin{itemize}
+    \item Each target must be in its own source file.
+    \item Each target must define a \texttt{LLVMFuzzerTestOneInput} harness.
+    \item Each target must derive structured values from raw fuzzer bytes.
+    \item Each target must check a nontrivial property using \texttt{assert}, \texttt{abort}, or another clear failure mechanism.
+    \item Each target must be deterministic and should terminate quickly.
+    \item Each target should be small: as a guideline, keep each target to roughly \textbf{100 lines or fewer}, excluding comments and blank lines.
+    \item At least one of your two targets should actually expose a property violation within the provided time budget.
+    \item The second target should be meaningfully different in difficulty or structure from the first.
+\end{itemize}
+
+\subsection*{Part 2 Writeup}
+For Part 2, write \textbf{one short section per target} answering:
+\begin{enumerate}
+    \item What does the target do?
+    \item What invariant/property are you checking? State it clearly, ideally in the form ``if \(P(x)\), then \(Q(x)\).''
+    \item How do raw bytes get turned into structured values?
+    \item Why did you expect this target to be easy or hard for the fuzzer?
+    \item What happened in practice?
+\end{enumerate}
+
+Also include a small table with \textbf{three runs per target} (30 seconds each is fine). For each run, report:
+\begin{itemize}
+    \item whether a failure was found,
+    \item approximate time to first failure, if any,
+    \item and one short sentence comparing Target A and Target B.
+\end{itemize}
+
+\subsection*{Part 2 Video Demonstration}
+You must submit a short video demonstrating both targets.
+
+Requirements:
+\begin{itemize}
+    \item Length: \textbf{3--6 minutes} total.
+    \item Show your code for both targets.
+    \item Show compilation commands.
+    \item Show at least one fuzzing run for each target.
+    \item The video must include \textbf{at least one live demonstration of a harness finding a bug/property violation}.
+    \item Briefly explain the property being tested and what happened.
+    \item Upload the video to YouTube and submit a \textbf{publicly accessible YouTube link}. The link must work without requiring course staff to request access.
+\end{itemize}
+
+A simple screen recording with narration is sufficient. The video does not need to be polished.
 
 \section*{Submission Instructions}
 Submit the following on Canvas:
+
+\subsection*{Part 1 Deliverables}
 \begin{itemize}
     \item your patched \texttt{libpng-course/course/course\_vuln.c} file \textbf{or} a unified patch/diff against the original file,
-    \item your writeup (PDF or Markdown), and
+    \item your Part 1 short writeup, and
     \item a small folder named \texttt{reproducers/} containing two files, one reproducing input for each of the two bugs you fixed.
 \end{itemize}
 
@@ -230,6 +458,15 @@ reproducers/bug2_input
 
 These reproducer files are raw binary inputs. They are \textbf{not} screenshots or pasted text. They should be the exact files you use with \texttt{./scripts/reproduce.sh}. After your fixes are applied, these same reproducer files should no longer trigger a sanitizer failure.
 
+\subsection*{Part 2 Deliverables}
+Submit:
+\begin{itemize}
+    \item \texttt{student\_targets/target1\_property\_fuzzer.cc}
+    \item \texttt{student\_targets/target2\_property\_fuzzer.cc}
+    \item your Part 2 writeup
+    \item a \textbf{public YouTube link} to your video demonstration
+\end{itemize}
+
 Do not submit Docker images, corpora generated during fuzzing, or unrelated build artifacts.
 
 \section*{Grading}
@@ -240,42 +477,46 @@ This project is graded using a combination of automated checks and manual review
 \toprule
 Component & Weight \\
 \midrule
-Setup works; code builds and runs in the provided workflow & 15\% \\
-Bug 1: reproducer, diagnosis, and fix & 25\% \\
-Bug 2: reproducer, diagnosis, and fix & 25\% \\
-Validation that crashing inputs no longer crash and valid PNGs still work & 20\% \\
-Clarity and correctness of the written explanations & 15\% \\
+Part 1 setup/build works in the provided workflow & 10\% \\
+Part 1 Bug 1: reproducer, diagnosis, and fix & 15\% \\
+Part 1 Bug 2: reproducer, diagnosis, and fix & 15\% \\
+Part 1 validation that reproducers no longer crash and valid PNGs still work & 10\% \\
+Part 1 short writeup quality & 10\% \\
+Part 2 Target A design and implementation & 10\% \\
+Part 2 Target B design and implementation & 10\% \\
+Part 2 analysis/writeup quality & 10\% \\
+Part 2 video demonstration (clarity and completeness) & 10\% \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Correct code is necessary but not sufficient. Clear reasoning and validation matter.
+Correct code is necessary but not sufficient. Clear reasoning, validation, and explanation matter.
 
 \section*{Academic Integrity}
-You may discuss high-level ideas with classmates, but all code, debugging, and writing must be your own. Do not share completed solutions, crash inputs with explanations, or patched source files.
+You may discuss high-level ideas with classmates, but all code, debugging, writing, and video explanation must be your own. Do not share completed solutions, crash inputs with explanations, patched source files, or finished Part 2 targets.
 
 \section*{Use of Generative AI Tools}
 Students are permitted to use generative AI tools (e.g., large language models) to assist with aspects of this project, including:
 \begin{itemize}
     \item understanding sanitizer reports, compiler errors, or unfamiliar C/C++ syntax,
     \item debugging code or exploring alternative bug fixes,
-    \item clarifying how fuzzing, memory errors, or Docker-based workflows operate,
-    \item brainstorming approaches to reproducing and validating crashes, and
+    \item clarifying how fuzzing, libFuzzer, or Docker-based workflows operate,
+    \item brainstorming candidate properties for Part 2, and
     \item improving the clarity of written explanations.
 \end{itemize}
 
 However, all submitted work must reflect your own understanding and reasoning. In particular:
 \begin{itemize}
-    \item You may not submit code, patches, or explanations that you do not understand.
-    \item You may not outsource the core debugging, repair, or interpretation of the bugs to an AI system.
-    \item You should be able to explain what each bug was, why your fix is correct, and how you verified it.
+    \item You may not submit code, patches, targets, or explanations that you do not understand.
+    \item You may not outsource the core debugging, repair, target design, or interpretation of results to an AI system.
+    \item You should be able to explain what each Part 1 bug was, why your fix is correct, how your Part 2 targets work, and why your properties make sense.
 \end{itemize}
 
-You are responsible for the correctness of any code, reproducer inputs, and written explanations you submit, regardless of whether an AI tool was used to help generate them. We may ask questions about your fixes, reproducer inputs, or debugging process to assess understanding.
+You are responsible for the correctness of any code, reproducer inputs, writeups, and video explanations you submit, regardless of whether an AI tool was used to help generate them. We may ask questions about your fixes, reproducer inputs, Part 2 targets, or debugging process to assess understanding.
 
-This project emphasizes debugging, reasoning, validation, and explanation. Over-reliance on generative tools without understanding may negatively affect grading, especially in categories related to diagnosis, correctness, and written explanation.
+This project emphasizes debugging, reasoning, validation, creativity, and explanation. Over-reliance on generative tools without understanding may negatively affect grading, especially in categories related to correctness, target design, and written or verbal explanation.
 
 \section*{Notes on Fuzzing Engine Choice}
-This project uses \texttt{libFuzzer} in the provided workflow because it integrates smoothly with the local OSS-Fuzz setup and is easier to run consistently across different laptop environments through Docker. AFL++ is an important modern standalone fuzzer and may be discussed in class, but all required grading for this project uses the provided \texttt{libFuzzer}-based workflow.
+Part 1 uses \texttt{libFuzzer} in the provided workflow because it integrates smoothly with the local OSS-Fuzz setup and is easier to run consistently across different laptop environments through Docker. Part 2 also uses \texttt{libFuzzer}, but in a much smaller and more open-ended way. AFL++ is an important modern standalone fuzzer and may be discussed in class, but all required grading for this project uses libFuzzer-based workflows.
 
 \end{document}
