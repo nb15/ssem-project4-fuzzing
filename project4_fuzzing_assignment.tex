@@ -79,22 +79,17 @@ The Part 1 target is based on \texttt{libpng} and is packaged in a containerized
 The goal of Part 2 is to practice fuzzing for \emph{properties}, not just crashes: defining an invariant, turning raw bytes into structured values, and using libFuzzer creatively to find violations.
 
 \section*{What You Are Given}
-You are provided with a repository containing:
+You are provided with a project bundle containing:
 \begin{itemize}
     \item a buggy course-owned fuzz target based on \texttt{libpng},
     \item an OSS-Fuzz project configuration for local Docker-based fuzzing,
     \item a small PNG seed corpus to help the fuzzer reach valid parsing paths,
-    \item a fuzz harness and intentionally seeded memory-safety bugs, and
-    \item helper scripts for building, fuzzing, reproducing crashes, and post-fix regression testing.
+    \item a fuzz harness and intentionally seeded memory-safety bugs,
+    \item helper scripts for building, fuzzing, reproducing crashes, and post-fix regression testing, and
+    \item a \texttt{student\_targets/} directory with starter templates for Part 2.
 \end{itemize}
 
 You should not replace the provided Part 1 target with a different target. Your work should focus on understanding, fixing, and validating the bugs in the provided code.
-
-For Part 2, the repository will also contain a directory for your own fuzzing targets:
-\begin{itemize}
-    \item \texttt{student\_targets/}
-\end{itemize}
-A starter template will be placed there for you to adapt.
 
 \section*{Learning Objectives}
 By completing this project, you will:
@@ -112,14 +107,15 @@ By completing this project, you will:
 You must use the provided Docker/OSS-Fuzz workflow for Part 1. Native local builds outside the containerized environment are \textbf{not supported} for Part 1.
 
 \subsection*{Step 1: Get the Code}
-Clone the course repository from the link provided on Canvas, then enter the repository root:
+Use the project package provided on Canvas. If you receive a zip archive, extract it and enter the repository root. If you were instead given a Git repository link, you may clone it.
 
 \begin{lstlisting}[style=bashstyle]
+# Example if using git:
 git clone <repo-url>
 cd ssem-project4-fuzzing
 \end{lstlisting}
 
-The repository root should contain at least:
+The project root should contain at least:
 \begin{itemize}
     \item \texttt{libpng-course/}
     \item \texttt{oss-fuzz/}
@@ -131,7 +127,7 @@ The repository root should contain at least:
 \subsection*{Step 2: Install Prerequisites}
 You need:
 \begin{itemize}
-    \item Git
+    \item Git (only if using the Git repository distribution)
     \item Docker Desktop (Mac/Windows) or Docker Engine (Linux)
     \item Python 3
 \end{itemize}
@@ -144,7 +140,7 @@ python3 --version
 \end{lstlisting}
 
 \subsection*{Step 3: Build the Project}
-From the repository root, run:
+From the project root, run:
 \begin{lstlisting}[style=bashstyle]
 ./scripts/build.sh
 \end{lstlisting}
@@ -161,7 +157,7 @@ If the build script asks whether to use a saved image or cached base images, alw
 The helper scripts explicitly use \texttt{python3}. If your system also has a \texttt{python} command, ignore it and use the provided scripts exactly as written.
 
 \subsection*{Step 4: Run the Fuzzer}
-From the repository root, run:
+From the project root, run:
 \begin{lstlisting}[style=bashstyle]
 ./scripts/fuzz.sh 30
 \end{lstlisting}
@@ -176,7 +172,11 @@ To reproduce a crash on a specific input, run:
 ./scripts/reproduce.sh seed_corpus/pngnow.png
 \end{lstlisting}
 
-The provided seed inputs (for example, \texttt{pngnow.png} and \texttt{pngtest.png}) are valid PNG files that help the fuzzer reach deeper parsing logic. In some cases, one of these seed inputs may already trigger a bug. In other cases, the fuzzer will generate a new crashing input. You should use whichever file reliably reproduces the bug you are analyzing.
+The provided seed inputs (for example, \texttt{pngnow.png} and \texttt{pngtest.png}) are valid PNG files that help the fuzzer reach deeper parsing logic. In some cases, one of these seed inputs may already trigger a bug immediately. In other cases, the fuzzer may mutate a seed input and produce a new crashing input. For Part 1, use \emph{whichever file reliably reproduces the bug you are analyzing}:
+\begin{itemize}
+    \item a provided seed input, or
+    \item a new crash file produced during fuzzing.
+\end{itemize}
 
 \subsection*{Step 6: Post-Fix Regression Check}
 After fixing the required bugs, run:
@@ -184,7 +184,7 @@ After fixing the required bugs, run:
 ./scripts/test_valid.sh
 \end{lstlisting}
 
-This verifies that the provided valid PNG inputs still execute successfully after your fixes.
+This is the provided regression test for valid PNG behavior. It verifies that the provided valid PNG inputs still execute successfully after your fixes. You should run this before submission.
 
 \subsection*{Debugging Common Issues}
 \begin{itemize}
@@ -222,7 +222,7 @@ A correct fix:
     \item removes the memory-safety error,
     \item modifies the buggy target logic rather than simply deleting large parts of the code,
     \item does not reject all inputs indiscriminately, and
-    \item preserves normal behavior on the provided valid PNG inputs.
+    \item preserves normal behavior on the provided valid PNG inputs, as checked by \texttt{./scripts/test\_valid.sh}.
 \end{itemize}
 
 \subsection*{Part 1 Short Writeup}
@@ -275,8 +275,19 @@ In other words, the goal is not merely to write code that crashes. The goal is t
     \item The goal is not to create the biggest target possible. Small, focused, well-explained targets are better.
 \end{itemize}
 
-\subsection*{Suggested Target Ideas}
-You do \textbf{not} have to use these, but these are the right level of ambition:
+\subsection*{Suggested Subject Domains}
+You do \textbf{not} have to use these, but these are good kinds of programs to build targets around:
+\begin{itemize}
+    \item small data structure implementations,
+    \item language parsers, formatters, or pretty-printers,
+    \item string normalization or cleanup routines,
+    \item encode/decode or serialize/deserialize helpers,
+    \item small arithmetic or numeric helper libraries,
+    \item tiny standalone open-source utilities or packages.
+\end{itemize}
+
+\subsection*{Suggested Property Ideas}
+You do \textbf{not} have to use these exact properties, but these are the right level of ambition:
 \begin{itemize}
     \item round-trip property: encode then decode should recover the original value,
     \item normalization/idempotence: applying a cleanup/normalize function twice should equal applying it once,
@@ -291,18 +302,18 @@ Place your Part 2 code in:
 student_targets/
 \end{lstlisting}
 
-A starter template will be provided there. You may duplicate and modify it to create your two targets.
+Starter templates are provided there. You may duplicate and modify them to create your two targets.
 
 \subsection*{Part 2 Environment and Installation Notes}
-You should not need to install a new fuzzer separately for Part 2 if you use the same environment that you set up for Part 1. In particular, the Part 1 workflow already assumes access to a libFuzzer-capable toolchain, and the provided Part 2 starter template is designed to work with \texttt{clang++}, libFuzzer, and \texttt{FuzzedDataProvider}.
+Part 2 is intended to be lighter-weight than Part 1, and the default expectation is that you will compile your Part 2 targets locally with a libFuzzer-capable \texttt{clang++}.
 
-If you choose to work outside that environment, then you are responsible for having:
+If your local toolchain does not support libFuzzer, then you will need a compatible LLVM/Clang installation that includes:
 \begin{itemize}
     \item a working \texttt{clang++} with libFuzzer support, and
     \item access to the header \texttt{<fuzzer/FuzzedDataProvider.h>}.
 \end{itemize}
 
-If you use a different setup, document it clearly in your writeup.
+If your local compiler does not work, consult the course staff early. If you use a non-default setup, document it clearly in your writeup.
 
 \subsection*{Using \texttt{FuzzedDataProvider}}
 You are encouraged to use \texttt{FuzzedDataProvider} to turn raw fuzzer bytes into structured values such as integers, booleans, strings, or small arrays. This is often much cleaner than manually slicing the input buffer by hand.
@@ -389,11 +400,7 @@ clang++ -g -O1 -fno-omit-frame-pointer \
 If your environment requires an equivalent libFuzzer-enabled C++ compiler, document exactly what you used in your writeup.
 
 \paragraph{Note on local compilation}
-On some systems (especially macOS), the default \texttt{clang++} may not include a working libFuzzer runtime. If you see errors mentioning missing \texttt{libclang\_rt.fuzzer}, you can either:
-\begin{itemize}
-    \item use the environment from Part 1, or
-    \item install a version of LLVM/Clang with libFuzzer support (e.g., via Homebrew on macOS).
-\end{itemize}
+On some systems (especially macOS), the default \texttt{clang++} may not include a working libFuzzer runtime. If you see errors mentioning missing \texttt{libclang\_rt.fuzzer}, you may need to install a version of LLVM/Clang with libFuzzer support.
 
 \subsection*{Constraints for Part 2}
 \begin{itemize}
@@ -500,7 +507,7 @@ Students are permitted to use generative AI tools (e.g., large language models) 
 \begin{itemize}
     \item understanding sanitizer reports, compiler errors, or unfamiliar C/C++ syntax,
     \item debugging code or exploring alternative bug fixes,
-    \item clarifying how fuzzing, libFuzzer, or Docker-based workflows operate,
+    \item clarifying how fuzzing, libFuzzer, or toolchain setup operates,
     \item brainstorming candidate properties for Part 2, and
     \item improving the clarity of written explanations.
 \end{itemize}
@@ -518,5 +525,27 @@ This project emphasizes debugging, reasoning, validation, creativity, and explan
 
 \section*{Notes on Fuzzing Engine Choice}
 Part 1 uses \texttt{libFuzzer} in the provided workflow because it integrates smoothly with the local OSS-Fuzz setup and is easier to run consistently across different laptop environments through Docker. Part 2 also uses \texttt{libFuzzer}, but in a much smaller and more open-ended way. AFL++ is an important modern standalone fuzzer and may be discussed in class, but all required grading for this project uses libFuzzer-based workflows.
+
+\appendix
+\section*{Appendix: Expected Output Examples}
+
+\subsection*{Successful build}
+A successful build should end with output that looks broadly like:
+\begin{lstlisting}[style=bashstyle]
+[course] Done. Output:
+...
+course_png_fuzzer
+course_png_fuzzer_seed_corpus.zip
+llvm-symbolizer
+\end{lstlisting}
+
+\subsection*{Expected fuzzing behavior}
+A correct fuzzing run may quickly print an AddressSanitizer report. For example, it may contain lines like:
+\begin{lstlisting}[style=bashstyle]
+ERROR: AddressSanitizer: ...
+SUMMARY: AddressSanitizer: ...
+\end{lstlisting}
+
+Seeing a sanitizer failure early in Part 1 is normal and usually indicates that your setup is working correctly.
 
 \end{document}
